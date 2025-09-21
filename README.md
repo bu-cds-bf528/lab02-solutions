@@ -1,4 +1,4 @@
-# Lab 2 - Workflow Basics"
+# Lab 2 - Workflow Basics
 
 Today we are going to construct a very basic workflow that downloads a microbial
 genome from the NCBI FTP server, and runs a script that calculates some simple
