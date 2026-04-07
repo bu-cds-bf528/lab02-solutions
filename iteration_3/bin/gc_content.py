@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-
 from Bio import SeqIO
 from Bio.SeqUtils import gc_fraction
 import gzip
