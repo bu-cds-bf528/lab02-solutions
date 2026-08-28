@@ -1,11 +1,13 @@
 #!/usr/bin/env nextflow
 
+nextflow.enable.types = true
+
 process NCBI_DATASETS_CLI {
     label 'process_single'
     conda 'envs/ncbidatasets_env.yml'
 
     output:
-    path('dataset/**/*.fna')
+    Path = file('dataset/**/*.fna')
 
     shell:
     """
@@ -17,14 +19,13 @@ process NCBI_DATASETS_CLI {
 process GENOME_STATS {
     
     conda 'envs/biopython_env.yml'
-    publishDir params.outdir
 
     input:
-    path(genome)
+    genome: Path
 
     output:
-    path('length.txt'), emit: length
-    path('gc_content.txt'), emit: gc_content
+    length: Path = file('length.txt')
+    gc_content: Path = file('gc_content.txt')
 
     script:
     """
@@ -36,7 +37,7 @@ process GENOME_STATS {
 process PRINT_GC {
 
     input:
-    path(gc)
+    gc: Path
 
     output:
     stdout
@@ -52,7 +53,7 @@ process PRINT_GC {
 process PRINT_LENGTH {
 
     input:
-    path(length)
+    length: Path
 
     output:
     stdout
@@ -65,9 +66,21 @@ process PRINT_LENGTH {
 
 }
 
+
 workflow {
-    NCBI_DATASETS_CLI()
-    GENOME_STATS(NCBI_DATASETS_CLI.out)
-    PRINT_GC(GENOME_STATS.out.gc_content)
-    PRINT_LENGTH(GENOME_STATS.out.length)
+    main:
+    datasets = NCBI_DATASETS_CLI()
+    stats = GENOME_STATS(datasets)
+    gc_out = PRINT_GC(stats.gc_content)
+    length_out = PRINT_LENGTH(stats.length)
+
+    publish:
+    length_out = stats.length
+    gc_out = stats.gc_content
+}
+
+output {
+    length_out {}
+
+    gc_out {}
 }

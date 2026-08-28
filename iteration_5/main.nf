@@ -1,9 +1,11 @@
 #!/usr/bin/env nextflow
 
+nextflow.enable.types = true
+
 process DOWNLOAD {
 
     output:
-    path("GCF_000005845.2_ASM584v2_genomic.fna.gz")
+    Path = file("GCF_000005845.2_ASM584v2_genomic.fna.gz")
 
     script:
     """
@@ -15,14 +17,14 @@ process DOWNLOAD {
 process GENOME_STATS {
     
     conda 'envs/biopython_env.yml'
-    publishDir params.outdir
+
 
     input:
-    path(genome)
+    genome: Path
 
     output:
-    path('length.txt'), emit: length
-    path('gc_content.txt'), emit: gc_content
+    length: Path = file('length.txt')
+    gc_content: Path = file('gc_content.txt')
 
     script:
     """
@@ -34,7 +36,7 @@ process GENOME_STATS {
 process PRINT_GC {
 
     input:
-    path(gc)
+    txt: Path
 
     output:
     stdout
@@ -42,7 +44,7 @@ process PRINT_GC {
     script:
     """
     echo "GC Content"
-    cat $gc
+    cat $txt
     """
 
 }
@@ -50,7 +52,7 @@ process PRINT_GC {
 process PRINT_LENGTH {
 
     input:
-    path(length)
+    txt: Path
 
     output:
     stdout
@@ -58,14 +60,25 @@ process PRINT_LENGTH {
     script:
     """
     echo "Length"
-    cat $length
+    cat $txt
     """
 
 }
 
 workflow {
-    DOWNLOAD()
-    GENOME_STATS(DOWNLOAD.out)
-    PRINT_GC(GENOME_STATS.out.gc_content)
-    PRINT_LENGTH(GENOME_STATS.out.length)
+    main:
+    dl_genome = DOWNLOAD()
+    stats = GENOME_STATS(dl_genome)
+    gc_out = PRINT_GC(stats.gc_content)
+    length_out = PRINT_LENGTH(stats.length)
+
+    publish:
+    length_out = stats.length
+    gc_out = stats.gc_content
+}
+
+output {
+    length_out {}
+
+    gc_out {}
 }

@@ -1,9 +1,11 @@
 #!/usr/bin/env nextflow
 
+nextflow.enable.types = true
+
 process DOWNLOAD {
 
     output:
-    path("GCF_000005845.2_ASM584v2_genomic.fna.gz")
+    Path = file("GCF_000005845.2_ASM584v2_genomic.fna.gz")
 
     script:
     """
@@ -17,10 +19,10 @@ process GC_CONTENT {
     conda 'envs/biopython_env.yml'
 
     input:
-    path(genome)
+    fasta: Path
 
     output:
-    path("gc_content.txt")
+    Path = file("gc_content.txt")
 
     script:
     """
@@ -30,7 +32,7 @@ process GC_CONTENT {
 
 
 workflow {
-    DOWNLOAD()
-    GC_CONTENT(DOWNLOAD.out)
+    dl_genome = DOWNLOAD()
+    gc_content_results = GC_CONTENT(dl_genome)
 
 }

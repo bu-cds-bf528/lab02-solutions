@@ -20,7 +20,7 @@ questions if you get stuck. We will walk through these exercises together.
 student folder in the /projectnb/bf528/students/<your-bu-username> directory. 
 Replace the <your-bu-username> with your BU ID and no @bu.edu.
 
-2. Accept the github classroom assignment for this lab and clone the repo to 
+2. Accept the classroom50 for this lab and clone the repo to 
 your directory.
 
 3. This lab will be completed in a series of iterations. Each iteration will build
@@ -32,7 +32,6 @@ iteration_X/ directory for each iteration.
 the following commands:
 
 ```bash
-module load miniconda
 conda activate nextflow_latest
 ```
 
@@ -119,19 +118,39 @@ Navigate to the iteration_3/ directory in a terminal and take note of the follow
 
 **In the main.nf**
 
+*At the top of the file*
+
+- Note the line `nextflow.enable.types = true`. This turns on Nextflow's
+typed syntax for declaring process inputs and outputs, which is what we will
+use for the rest of this lab. It is a newer, stricter way of writing
+processes where every input and output is given an explicit type.
+
 *Within the `process`*
--The `output` - this specifies the file that will be created or exist
+- The `output` - this specifies the file that will be created or exist
 at the end of the process
 
-- Note how we specify `path` in the output to indicate that we expect a file
-to be created. You can also specify `val` to indicate that we expect a value,
-or even tuple to indicate that we expect multiple elements to be created. 
+- With typed syntax, an output is declared as `Type = expression`:
+
+```groovy
+output:
+Path = file("GCF_000005845.2_ASM584v2_genomic.fna.gz")
+```
+
+Here `Path` is the type of the output (i.e. a file or directory), and
+`file(...)` tells Nextflow which file, created inside the process's work
+directory, should be captured as that output. In Iteration 5 you'll see
+outputs can also be given a name, e.g. `length: Path = file('length.txt')`,
+which lets you refer to a specific output by name rather than position.
 
 - The `script` - this is where the commands are executed and you can see the
 same wget command we ran earlier on the terminal
 
 *Within the `workflow`*
-- The `DOWNLOAD()` calls the DOWNLOAD process
+- The `DOWNLOAD()` calls the DOWNLOAD process. Calling a process returns its
+output(s), which we assign to a variable, e.g. `dl_genome = DOWNLOAD()`. That
+variable can then be passed into another process the same way you would pass
+any other variable, e.g. `GC_CONTENT(dl_genome)`. This replaces the older
+`PROCESS.out` syntax you may see in other Nextflow examples online.
 
 **In the bin/ directory:**
 
@@ -174,6 +193,10 @@ Notice how we are not required to specify `python` to run the script.
 output of the DOWNLOAD process as input and runs the gc_content.py script on it. 
 Structure it with similar syntax as the DOWNLOAD process.
 
+- Declare the input using the typed syntax `name: Path`, e.g. `fasta: Path`.
+This gives a name to the incoming file, similar to how `Path = file(...)`
+names and types an output.
+
 - Make sure to check the script to see what file it creates and set that as the
 output
 
@@ -184,8 +207,9 @@ line that looks like:
 conda 'envs/biopython_env.yml'
 ```
 
-3. In the workflow block of the `main.nf`,Use `DOWNLOAD.out` to pass the output
-of the DOWNLOAD process to the GC_CONTENT process.
+3. In the workflow block of the `main.nf`, assign the result of `DOWNLOAD()`
+to a variable (e.g. `dl_genome = DOWNLOAD()`) and pass that variable into the
+GC_CONTENT process, e.g. `GC_CONTENT(dl_genome)`.
 
 - Call the GC_CONTENT process the same way the DOWNLOAD process was called
 
@@ -294,11 +318,20 @@ gc_content.py -i <fasta_file> -o <length_file>
 - The process should take the output of the DOWNLOAD process as input and pass it
 to the gc_content.py script
 
+- As in Iteration 3, declare the input with the typed syntax `name: Path`,
+e.g. `genome: Path`. Whatever name you give it (`genome` in this example) is
+the variable you use to refer to that file elsewhere in the process.
+
 - Pass the appropriate files on the command line to the python script. Remember
-that you may access values in the input and output of a nextflow process. Values
-in the input may be accessed using the $ symbol. 
+that you may access values in the input and output of a nextflow process. A
+named input may be accessed in the `script` block using the $ symbol followed
+by the name you gave it, e.g. `$genome`. 
 
 4. Update the workflow block to call the new process like in the last exercise
+
+- Assign the output of `DOWNLOAD()` to a variable and pass that variable into
+your new process, e.g. `dl_genome = DOWNLOAD()` followed by
+`GC_CONTENT(dl_genome)`.
 
 5. Run the nextflow script using `nextflow run main.nf -profile conda,cluster`
 
@@ -311,8 +344,8 @@ in the input may be accessed using the $ symbol.
 # Fifth Iteration - Specifying multiple outputs in a process
 
 Sometimes we will want to have a process that creates multiple outputs and pass
-the outputs to different processes. Nextflow provides a way to do this using the
-`emit` keyword. 
+the outputs to different processes. Nextflow provides a way to do this using dot notation,
+similar to other programming languages. 
 
 Navigate to the iteration_5/ directory and you'll notice a few differences:
 
@@ -321,31 +354,47 @@ writes the output to them - gc_content.txt and length.txt.
 
 2. The main.nf file now has four processes: DOWNLOAD, GENOME_STATS, PRINT_GC, and PRINT_LENGTH.
 
-3. Pay attention to the `output block` of the GENOME_STATS process. It has two outputs:
+3. Pay attention to the `output block` of the GENOME_STATS process. It has two outputs,
+each given a name:
 
 ```bash
 output:
-    path("gc_content.txt"), emit: gc_content
-    path("length.txt"), emit: length
+    length: Path = file('length.txt')
+    gc_content: Path = file('gc_content.txt')
 ```
 
-By using `emit`, we can pass different outputs to different processes by calling
-the separate outputs by the name we give them in `emit`. We can individually 
-access different outputs using the <PROCESS NAME>.out.<EMIT NAME> notation. For
-our example, we can access the gc_content.txt file using `GENOME_STATS.out.gc_content`
-and the length.txt file using `GENOME_STATS.out.length`.
+Also note that the input for GENOME_STATS is also declared with a typed,
+named input, e.g. `genome: Path`, the same as you saw in the previous iteration.
 
-4. Add a line underneath the `conda` line in this process:
+When you call GENOME_STATS in the workflow block, assign the result to a
+variable, e.g. `stats = GENOME_STATS(dl_genome)`. Because the outputs above
+were given names, you can then access each one individually using dot
+notation on that variable: `stats.length` and `stats.gc_content`. This is
+how we pass different outputs of the same process to different downstream
+processes (PRINT_GC and PRINT_LENGTH).
 
-```bash
-publishDir params.outdir
-```
-
-5. Look at the contents of the genome_stats.py script and properly fill out the
+4. Look at the contents of the genome_stats.py script and properly fill out the
 `script` block with the appropriate commands to run the script.
 
-6. Send the appropriate outputs of the GENOME_STATS process to the PRINT_GC and PRINT_LENGTH
+5. Send the appropriate outputs of the GENOME_STATS process to the PRINT_GC and PRINT_LENGTH
 processes in the workflow.
+
+6. In your `main.nf`, look at the `publish` block provided for you underneath the workflow
+block `main`. Here is where you will specify which files you want to "send" to a directory of your
+choice. This is convenient for gathering the important results from a workflow without
+having to navigate through the nested structure of the `work/` directory. 
+
+For each process output you want to keep, add a line under `publish` that assigns a name to 
+the channel you want published - for example, `fastqc_logs = fastqc_ch`. This name does not
+need to be the same as the channel name but you should try to choose something descriptive so
+it's easy to intuit what it represents. Do this for all of the outputs you want to easily
+access.
+
+Once you've finished listing the outputs under `publish`, look at the `output` block at the
+bottom of the workflow script. Every name you assigned in `publish` must appear here as its
+own entry. Add an entry for each of your published names (e.g. fastqc_logs {}). Once you have
+done this, run the pipeline again and check your `results/` directory - you should see your
+published files copied here without the hashed subdirectories in `work`
 
 7. Once finished, run the nextflow script using the following command:
 
@@ -353,8 +402,8 @@ processes in the workflow.
 nextflow run main.nf -profile conda,cluster
 ```
 
-- [ ] Learn how emit lets us name outputs and pass them to other processes
-- [ ] Use publishDir to publish outputs to a directory outside of work/
+- [ ] Learn how naming outputs lets us access them individually with dot notation
+- [ ] Use the `publish` and `output` blocks to make the pipeline outputs available in `results/`
 - [ ] Inspect the work/ directory to see where the outputs are stored and the
 various log files that are created
 - [ ] Send the appropriate outputs of the GENOME_STATS process to the PRINT_GC and PRINT_LENGTH
@@ -362,17 +411,22 @@ processes in the workflow
 - [ ] Run the nextflow script
 - [ ] Take a look at the nextflow.config file and understand what we store there
 
-# Optional
-
-If you have been able to do all of the above, you can try to do the following
-in a new directory called iteration_6:
+# Sixth Iteration
 
 1. Instead of using `wget`, develop a nextflow workflow that instead utilizes
 the `ncbi-datasets-cli` tool to download the E. coli genome.
 
-2. Keep the rest of the workflow the same as iteration_5 and run the `genome_stats.py`
-script on the downloaded E. Coli genome.
+- This process only produces a single, unnamed output, so declare it the same
+way as the DOWNLOAD process in earlier iterations: `Path = file(...)`.
 
-*Hint*
-You may want to try running the ncbi datasets command on the terminal to see what
-options are available and what file is downloaded. 
+2. Keep the rest of the workflow the same as iteration_5 and run the `genome_stats.py`
+script on the downloaded E. Coli genome, including the `publishDir` line you
+added to GENOME_STATS.
+
+- Don't forget to include `nextflow.enable.types = true` near the top of this
+`main.nf` as well, since we're using the same typed input/output syntax here
+
+# Ending Notes
+
+What aspects of the final iteration can still be improved upon in terms of reproducibility,
+portability and usability? Where does it still fall short in terms of ease of reuse?
